@@ -1,0 +1,102 @@
+import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'voice_room_page.dart'; // سننشئ هذا لاحقاً
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  runApp(MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Bablo',
+      theme: ThemeData(primarySwatch: Colors.blue),
+      home: PhoneAuthPage(),
+    );
+  }
+}
+
+class PhoneAuthPage extends StatefulWidget {
+  @override
+  _PhoneAuthPageState createState() => _PhoneAuthPageState();
+}
+
+class _PhoneAuthPageState extends State<PhoneAuthPage> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final TextEditingController phoneController = TextEditingController();
+  final TextEditingController codeController = TextEditingController();
+  String verificationId = "";
+
+  void sendCode() async {
+    await _auth.verifyPhoneNumber(
+      phoneNumber: phoneController.text,
+      verificationCompleted: (PhoneAuthCredential credential) async {
+        await _auth.signInWithCredential(credential);
+        goToVoiceRoom();
+      },
+      verificationFailed: (e) {
+        print("فشل التحقق: ${e.message}");
+      },
+      codeSent: (verId, token) {
+        setState(() {
+          verificationId = verId;
+        });
+        print("تم إرسال الرمز!");
+      },
+      codeAutoRetrievalTimeout: (verId) {
+        verificationId = verId;
+      },
+    );
+  }
+
+  void verifyCode() async {
+    try {
+      PhoneAuthCredential credential = PhoneAuthProvider.credential(
+        verificationId: verificationId,
+        smsCode: codeController.text,
+      );
+      await _auth.signInWithCredential(credential);
+      goToVoiceRoom();
+    } catch (e) {
+      print("رمز غير صحيح!");
+    }
+  }
+
+  void goToVoiceRoom() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => VoiceRoomPage()),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text("تسجيل الدخول")),
+      body: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          children: [
+            TextField(
+              controller: phoneController,
+              decoration: InputDecoration(labelText: "رقم الهاتف (+213...)"),
+            ),
+            SizedBox(height: 10),
+            ElevatedButton(onPressed: sendCode, child: Text("إرسال الرمز")),
+            SizedBox(height: 10),
+            TextField(
+              controller: codeController,
+              decoration: InputDecoration(labelText: "أدخل الرمز"),
+            ),
+            SizedBox(height: 10),
+            ElevatedButton(onPressed: verifyCode, child: Text("تأكيد")),
+          ],
+        ),
+      ),
+    );
+  }
+}
